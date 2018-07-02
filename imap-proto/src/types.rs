@@ -98,22 +98,24 @@ pub enum Attribute {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum MessageSection {
+pub enum MessageSection<'a> {
     Header,
+    HeaderFields { fields: Vec<&'a str> },
+    HeaderFieldsNot { fields: Vec<&'a str> },
     Mime,
     Text,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum SectionPath {
-    Full(MessageSection),
-    Part(Vec<u32>, Option<MessageSection>),
+pub enum SectionPath<'a> {
+    Full(MessageSection<'a>),
+    Part(Vec<u32>, Option<MessageSection<'a>>),
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum AttributeValue<'a> {
     BodySection {
-        section: Option<SectionPath>,
+        section: Option<SectionPath<'a>>,
         index: Option<u32>,
         data: Option<&'a [u8]>,
     },

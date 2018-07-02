@@ -185,13 +185,21 @@ named!(section_part<Vec<u32>>, do_parse!(
     })
 ));
 
-named!(section_msgtext<MessageSection>, map!(
-    alt!(tag_s!("HEADER") | tag_s!("TEXT")),
-    |s| match s {
-        b"HEADER" => MessageSection::Header,
-        b"TEXT" => MessageSection::Text,
-        _ => panic!("cannot happen"),
-    }
+named!(section_msgtext<MessageSection>, alt!(
+    do_parse!(
+        tag_s!("HEADER.FIELDS.NOT (") >>
+        fields: separated_nonempty_list!(tag_s!(" "), atom) >>
+        tag_s!(")") >>
+        (MessageSection::HeaderFieldsNot { fields: fields })
+    ) |
+    do_parse!(
+        tag_s!("HEADER.FIELDS (") >>
+        fields: separated_nonempty_list!(tag_s!(" "), atom) >>
+        tag_s!(")") >>
+        (MessageSection::HeaderFields { fields: fields })
+    ) |
+    do_parse!(tag_s!("HEADER") >> (MessageSection::Header)) |
+    do_parse!(tag_s!("TEXT") >> (MessageSection::Text))
 ));
 
 named!(section_text<MessageSection>, alt!(
@@ -712,6 +720,23 @@ mod tests {
                 let body = &attrs[0];
                 assert_eq!(body, &AttributeValue::BodySection {
                     section: Some(SectionPath::Full(MessageSection::Text)),
+                    index: None,
+                    data: Some(b"foo"),
+                }, "body = {:?}", body);
+            },
+            rsp @ _ => panic!("unexpected response {:?}", rsp),
+        }
+    }
+
+    #[test]
+    fn test_body_header_fields() {
+        match parse_response(
+            b"* 2 FETCH (BODY[HEADER.FIELDS (Message-ID)] {3}\r\nfoo)\r\n",
+        ) {
+            IResult::Done(_, Response::Fetch(_, attrs)) => {
+                let body = &attrs[0];
+                assert_eq!(body, &AttributeValue::BodySection {
+                    section: Some(SectionPath::Full(MessageSection::HeaderFields { fields: vec!["Message-ID"] })),
                     index: None,
                     data: Some(b"foo"),
                 }, "body = {:?}", body);
